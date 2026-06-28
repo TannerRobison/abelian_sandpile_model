@@ -9,36 +9,36 @@
 #define COLOR_YELLOW "\033[31m" // cell value 2
 #define COLOR_WHITE "\033[31m"  // cell value 1
 
-int positions[HEIGHT][WIDTH];
-int new_positions[HEIGHT][WIDTH];
+#define WIDTH 40
+#define HEIGHT 40
 
-int
-
-    void
-    init_grid();
-void draw_new_positions();
-void render();
+int init_grid(int positions[HEIGHT][WIDTH]);
+int draw_new_positions();
+int render();
 
 int main() {
   // gets terminal window size
   struct winsize w;
-  ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+  // ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+
+  int positions[HEIGHT][WIDTH];
+  int (*ppositions)[] = positions;
+  int new_positions[HEIGHT][WIDTH];
 
   printf("starting abellian sandpile simulation\n");
-  init_grid();
+  init_grid(ppositions);
   printf("\ninitialized grid");
   return 0;
 }
 
-void init_grid() {
+int init_grid(int positions[HEIGHT][WIDTH]) {
   for (int i = 0; i < HEIGHT; i++) {
     for (int j = 0; j < WIDTH; j++) {
-      printf(" ");
-
-      // prints a X around the borders
-      if (j = (WIDTH - 1)) {
-        printf("|");
-      }
+      positions[i][j] = 0;
+      printf("%d", positions);
     }
+    printf("\n");
   }
+
+  return 0;
 }
