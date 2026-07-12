@@ -1,15 +1,16 @@
 #include <asm-generic/ioctls.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
 
-#define CLEAR_GRID "\033[0m"
+#define CLEAR_GRID "\033[1;1H\033[2J"
 #define COLOR_RED "\033[31m"    // cell value 4
 #define COLOR_ORANGE "\033[31m" // cell value 3
-#define COLOR_YELLOW "\033[31m" // cell value 2
-#define COLOR_WHITE "\033[31m"  // cell value 1
+#define COLOR_YELLOW "\033[33m" // cell value 2
+#define COLOR_WHITE "\033[37m"  // cell value 1
 
 int init_grid(int height, int width, int (*positions)[width]);
 int get_new_positions(int height, int width, int (*positions)[width],
@@ -58,7 +59,16 @@ int main() {
   if (startup_status) {
     fprintf(stderr, "Failed to initialize grid");
   }
-  get_new_positions(terminal_width, terminal_width, positions, new_positions);
+
+  uint32_t time_steps = 20000000;
+  for (int i = 0; i < time_steps; i++) {
+    // drop a 'grain' of sand of top of sandpile
+    positions[10][60] += 1;
+    get_new_positions(terminal_height, terminal_width, positions,
+                      new_positions);
+    printf(CLEAR_GRID);
+    render(terminal_height, terminal_width, positions, new_positions);
+  }
 
   free(positions);
   free(new_positions);
@@ -78,25 +88,48 @@ int init_grid(int height, int width, int (*positions)[width]) {
 
 int get_new_positions(int height, int width, int (*positions)[width],
                       int (*new_positions)[width]) {
-  new_positions = positions;
-
+  memset(new_positions, 0, width * height * sizeof(int));
   // getting new positions
   for (int i = 0; i < height; i++) {
-    for (int j = 0; j < width; i++) {
+    for (int j = 0; j < width; j++) {
       if (positions[i][j] >= 4) {
-        // add some logic here
-        new_positions[i][j] = 0;
-        new_positions[i][j] = positions[i + 1][j] + 1;
-        new_positions[i][j] = positions[i - 1][j] + 1;
-        new_positions[i][j] = positions[i][j + 1] + 1;
-        new_positions[i][j] = positions[i][j - 1] + 1;
+        new_positions[i][j] = 0; // Current cell becomes stable
+
+        // Distribute sand to neighboring cells
+        if (i + 1 < height)
+          new_positions[i + 1][j] += 1; // Down
+        if (i - 1 >= 0)
+          new_positions[i - 1][j] += 1; // Up
+        if (j + 1 < width)
+          new_positions[i][j + 1] += 1; // Right
+        if (j - 1 >= 0)
+          new_positions[i][j - 1] += 1; // Left
+      } else {
+        new_positions[i][j] += positions[i][j]; // Stable cells remain the same
       }
     }
   }
+  memcpy(positions, new_positions, height * width * sizeof(int));
   return 0;
 }
 
 int render(int height, int width, int (*positions)[width],
            int (*new_positions)[width]) {
+  for (int i = 0; i < height; i++) {
+    for (int j = 0; j < width; j++) {
+      if (new_positions[i][j] == 0) {
+        printf(" "); // Empty cell
+      } else if (new_positions[i][j] == 1) {
+        printf(COLOR_WHITE "1"); // Cell with value 1
+      } else if (new_positions[i][j] == 2) {
+        printf(COLOR_YELLOW "2"); // Cell with value 2
+      } else if (new_positions[i][j] == 3) {
+        printf(COLOR_ORANGE "3"); // Cell with value 3
+      } else if (new_positions[i][j] >= 4) {
+        printf(COLOR_RED "4"); // Cell with value 4 or more
+      }
+    }
+    printf("\n"); // Move to the next line after each row
+  }
   return 0;
 }
