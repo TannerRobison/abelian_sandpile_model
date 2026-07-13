@@ -60,15 +60,18 @@ int main() {
     fprintf(stderr, "Failed to initialize grid");
   }
 
-  uint32_t time_steps = 4000000000; //4 billion time steps
-  for (int i = 0; i < time_steps; i++) {
+  uint8_t render_count = 100; //100 renders
+  uint32_t render_gap = 100000; //renders every 100k time steps
+  for (uint8_t i = 0; i < render_count; i++) {
     // drop a 'grain' of sand of top of sandpile
-    for (int j = 0; j < 100000; j++) {
+    for (uint32_t j = 0; j < render_gap; j++) {
       positions[terminal_height / 2][terminal_width / 2] += 1;
       get_new_positions(terminal_height, terminal_width, positions,
                         new_positions);
     }
-    printf("time step: %u", (unsigned int)time_steps);
+    uint64_t current_step = (uint32_t)i * render_gap;
+    printf("time step: %u", (unsigned int)current_step);
+
     printf(CLEAR_GRID);
     render(terminal_height, terminal_width, positions, new_positions);
   }
