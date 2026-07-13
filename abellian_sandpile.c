@@ -60,12 +60,15 @@ int main() {
     fprintf(stderr, "Failed to initialize grid");
   }
 
-  uint32_t time_steps = 20000000;
+  uint32_t time_steps = 4000000000; //4 billion time steps
   for (int i = 0; i < time_steps; i++) {
     // drop a 'grain' of sand of top of sandpile
-    positions[10][60] += 1;
-    get_new_positions(terminal_height, terminal_width, positions,
-                      new_positions);
+    for (int j = 0; j < 100000; j++) {
+      positions[terminal_height / 2][terminal_width / 2] += 1;
+      get_new_positions(terminal_height, terminal_width, positions,
+                        new_positions);
+    }
+    printf("time step: %u", (unsigned int)time_steps);
     printf(CLEAR_GRID);
     render(terminal_height, terminal_width, positions, new_positions);
   }
@@ -120,13 +123,13 @@ int render(int height, int width, int (*positions)[width],
       if (new_positions[i][j] == 0) {
         printf(" "); // Empty cell
       } else if (new_positions[i][j] == 1) {
-        printf(COLOR_WHITE "."); // Cell with value 1
+        printf(COLOR_WHITE "o"); // Cell with value 1
       } else if (new_positions[i][j] == 2) {
-        printf(COLOR_YELLOW "o"); // Cell with value 2
+        printf(COLOR_YELLOW "0"); // Cell with value 2
       } else if (new_positions[i][j] == 3) {
-        printf(COLOR_ORANGE "0"); // Cell with value 3
+        printf(COLOR_ORANGE "@"); // Cell with value 3
       } else if (new_positions[i][j] >= 4) {
-        printf(COLOR_RED "4"); // Cell with value 4 or more
+        printf(COLOR_RED "#"); // Cell with value 4 or more
       }
     }
     printf("\n"); // Move to the next line after each row
