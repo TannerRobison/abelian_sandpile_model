@@ -6,12 +6,6 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 
-#define CLEAR_GRID "\033[1;1H\033[2J"
-#define COLOR_RED "\033[31m"    // cell value 4
-#define COLOR_ORANGE "\033[31m" // cell value 3
-#define COLOR_YELLOW "\033[33m" // cell value 2
-#define COLOR_WHITE "\033[37m"  // cell value 1
-
 #define COLOR_DARK_BLUE  "\033[38;5;19m"  // cell value 4 (Dark Blue)
 #define COLOR_MED_BLUE   "\033[38;5;33m"  // cell value 3 (Medium Blue)
 #define COLOR_LIGHT_BLUE "\033[38;5;81m"  // cell value 2 (Light Blue)
@@ -65,16 +59,16 @@ int main() {
     fprintf(stderr, "Failed to initialize grid");
   }
 
-  uint8_t render_count = 100; //100 renders
+  uint32_t render_count = 100; //100 renders
   uint32_t render_gap = 100000; //renders every 100k time steps
-  for (uint8_t i = 0; i < render_count; i++) {
+  for (uint32_t i = 0; i < render_count; i++) {
     // drop a 'grain' of sand of top of sandpile
     for (uint32_t j = 0; j < render_gap; j++) {
       positions[terminal_height / 2][terminal_width / 2] += 1;
       get_new_positions(terminal_height, terminal_width, positions,
                         new_positions);
     }
-    uint64_t current_step = (uint32_t)i * render_gap;
+    uint64_t current_step = i * render_gap;
     printf("time step: %u", (unsigned int)current_step);
 
     printf(CLEAR_GRID);
