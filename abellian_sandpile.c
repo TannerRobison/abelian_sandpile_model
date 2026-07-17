@@ -16,7 +16,7 @@ int init_grid(int height, int width, int (*positions)[width]);
 int get_new_positions(int height, int width, int (*positions)[width],
                       int (*new_positions)[width]);
 int render(int height, int width, int (*positions)[width],
-           int (*new_positions)[width]);
+           int (*new_positions)[width], FILE *output_file);
 
 int main() {
   int startup_status = 0;
@@ -60,22 +60,35 @@ int main() {
     fprintf(stderr, "Failed to initialize grid");
   }
 
-  uint8_t render_count = 100; //100 renders
+  uint32_t render_count = 100; //100 renders
   uint32_t render_gap = 100000; //renders every 100k time steps
-  for (uint8_t i = 0; i < render_count; i++) {
+  for (uint32_t i = 0; i < render_count; i++) {
     // drop a 'grain' of sand of top of sandpile
     for (uint32_t j = 0; j < render_gap; j++) {
       positions[terminal_height / 2][terminal_width / 2] += 1;
       get_new_positions(terminal_height, terminal_width, positions,
                         new_positions);
     }
-    uint64_t current_step = (uint32_t)i * render_gap;
+    uint64_t current_step = i * render_gap;
     printf("time step: %u", (unsigned int)current_step);
 
+    FILE *temp_file = fopen("temp_frame.txt", "w");
+    if (temp_file != NULL) {
+        render(terminal_height, terminal_width, positions, new_positions, temp_file);
+        fclose(temp_file);
+
+        //save text file as png
+        char command[256];
+        sprintf(command, "ansilove temp_frame.txt -c %d -o frame_%.0d.png > /dev/null 2>&1"
+                ,terminal_width, i);
+        system(command);
+    }
+
     printf(CLEAR_GRID);
-    render(terminal_height, terminal_width, positions, new_positions);
+    render(terminal_height, terminal_width, positions, new_positions, stdout);
   }
 
+  system("rm temp_frame.txt");
   free(positions);
   free(new_positions);
   return 0;
@@ -120,22 +133,22 @@ int get_new_positions(int height, int width, int (*positions)[width],
 }
 
 int render(int height, int width, int (*positions)[width],
-           int (*new_positions)[width]) {
+           int (*new_positions)[width], FILE *output_file) {
   for (int i = 0; i < height; i++) {
     for (int j = 0; j < width; j++) {
       if (new_positions[i][j] == 0) {
-        printf(" "); // Empty cell
+        fprintf(output_file, " ");
       } else if (new_positions[i][j] == 1) {
-        printf(COLOR_WHITE "o"); // Cell with value 1
+        fprintf(output_file, COLOR_WHITE "o");
       } else if (new_positions[i][j] == 2) {
-        printf(COLOR_YELLOW "0"); // Cell with value 2
+        fprintf(output_file, COLOR_YELLOW "0");
       } else if (new_positions[i][j] == 3) {
-        printf(COLOR_ORANGE "@"); // Cell with value 3
+        fprintf(output_file, COLOR_RED "@");
       } else if (new_positions[i][j] >= 4) {
-        printf(COLOR_RED "#"); // Cell with value 4 or more
+        fprintf(output_file, COLOR_RED "#");
       }
     }
-    printf("\n"); // Move to the next line after each row
+    fprintf(output_file, "\n");
   }
   return 0;
 }
