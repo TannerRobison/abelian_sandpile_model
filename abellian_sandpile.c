@@ -12,6 +12,11 @@
 #define COLOR_YELLOW "\033[33m" // cell value 2
 #define COLOR_WHITE "\033[37m"  // cell value 1
 
+#define COLOR_DARK_BLUE  "\033[38;5;19m"  // cell value 4 (Dark Blue)
+#define COLOR_MED_BLUE   "\033[38;5;33m"  // cell value 3 (Medium Blue)
+#define COLOR_LIGHT_BLUE "\033[38;5;81m"  // cell value 2 (Light Blue)
+#define COLOR_ICE_BLUE   "\033[38;5;195m" // cell value 1 (Very Light Blue)
+
 int init_grid(int height, int width, int (*positions)[width]);
 int get_new_positions(int height, int width, int (*positions)[width],
                       int (*new_positions)[width]);
@@ -126,13 +131,13 @@ int render(int height, int width, int (*positions)[width],
       if (new_positions[i][j] == 0) {
         printf(" "); // Empty cell
       } else if (new_positions[i][j] == 1) {
-        printf(COLOR_WHITE "1"); // Cell with value 1
+        printf(COLOR_ICE_BLUE "1"); // Cell with value 1
       } else if (new_positions[i][j] == 2) {
-        printf(COLOR_YELLOW "2"); // Cell with value 2
+        printf(COLOR_LIGHT_BLUE "2"); // Cell with value 2
       } else if (new_positions[i][j] == 3) {
-        printf(COLOR_ORANGE "3"); // Cell with value 3
+        printf(COLOR_MED_BLUE "3"); // Cell with value 3
       } else if (new_positions[i][j] >= 4) {
-        printf(COLOR_RED "4"); // Cell with value 4 or more
+        printf(COLOR_DARK_BLUE "4"); // Cell with value 4 or more
       }
     }
     printf("\n"); // Move to the next line after each row
