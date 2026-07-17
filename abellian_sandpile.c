@@ -126,13 +126,13 @@ int render(int height, int width, int (*positions)[width],
       if (new_positions[i][j] == 0) {
         printf(" "); // Empty cell
       } else if (new_positions[i][j] == 1) {
-        printf(COLOR_WHITE "o"); // Cell with value 1
+        printf(COLOR_WHITE "1"); // Cell with value 1
       } else if (new_positions[i][j] == 2) {
-        printf(COLOR_YELLOW "0"); // Cell with value 2
+        printf(COLOR_YELLOW "2"); // Cell with value 2
       } else if (new_positions[i][j] == 3) {
-        printf(COLOR_ORANGE "@"); // Cell with value 3
+        printf(COLOR_ORANGE "3"); // Cell with value 3
       } else if (new_positions[i][j] >= 4) {
-        printf(COLOR_RED "#"); // Cell with value 4 or more
+        printf(COLOR_RED "4"); // Cell with value 4 or more
       }
     }
     printf("\n"); // Move to the next line after each row
