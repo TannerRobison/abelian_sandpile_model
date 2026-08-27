@@ -62,9 +62,10 @@ int main(void)
 	while (running) {
 		if (!sandpile.paused) {
 			add_grain(&sandpile);
-			update_sandpile(&sandpile);
-			draw_sandpile(&sandpile);
 		}
+
+		update_sandpile(&sandpile);
+		draw_sandpile(&sandpile);
 		running = handle_input(&sandpile);
 	}
 
