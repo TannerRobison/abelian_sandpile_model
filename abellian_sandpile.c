@@ -1,140 +1,249 @@
-#include <asm-generic/ioctls.h>
+#include <ncurses.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/ioctl.h>
 #include <unistd.h>
 
-#define COLOR_DARK_BLUE  "\033[38;5;19m"  // cell value 4 (Dark Blue)
-#define COLOR_MED_BLUE   "\033[38;5;33m"  // cell value 3 (Medium Blue)
-#define COLOR_LIGHT_BLUE "\033[38;5;81m"  // cell value 2 (Light Blue)
-#define COLOR_ICE_BLUE   "\033[38;5;195m" // cell value 1 (Very Light Blue)
+#define COLOR_DARK_BLUE "\033[38;5;19m"	 // cell value 4 (Dark Blue)
+#define COLOR_MED_BLUE "\033[38;5;33m"	 // cell value 3 (Medium Blue)
+#define COLOR_LIGHT_BLUE "\033[38;5;81m" // cell value 2 (Light Blue)
+#define COLOR_ICE_BLUE "\033[38;5;195m"	 // cell value 1 (Very Light Blue)
 
-int init_grid(int height, int width, int (*positions)[width]);
-int get_new_positions(int height, int width, int (*positions)[width],
-                      int (*new_positions)[width]);
-int render(int height, int width, int (*positions)[width],
-           int (*new_positions)[width]);
+struct sandpile {
+	size_t rows;
+	size_t columns;
+	size_t *cells;
+	size_t *next;
+	bool paused;
+	size_t steps;
+};
 
-int main() {
-  int startup_status = 0;
-  // gets terminal window size
-  struct winsize w;
-  ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
-  if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &w) == -1) {
-    fprintf(stderr, "Failed to get terminal window size");
-    return 1;
-  }
+static void init_sandpile(struct sandpile *sandpile);
+static void destroy_sandpile(struct sandpile *sandpile);
 
-  int terminal_height = w.ws_row;
-  int terminal_width = w.ws_col;
+static void add_grain(struct sandpile *sandpile);
+static void update_sandpile(struct sandpile *sandpile);
 
-  int (*positions)[terminal_width] =
-      malloc(terminal_height * terminal_width * sizeof(int));
-  if (positions == NULL) {
-    fprintf(stderr, "Failed to allocate for positions");
-    return 1;
-  }
-  // fill array with zeros
-  memset(positions, 0, terminal_height * terminal_width * sizeof(int));
+static void draw_sandpile(struct sandpile *sandpile);
+static void draw_status(struct sandpile *sandpile);
 
-  int (*new_positions)[terminal_width] =
-      malloc(terminal_height * terminal_width * sizeof(int));
-  if (new_positions == NULL) {
-    fprintf(stderr, "Failed to allocate for new_positions");
-    free(positions);
-    return 1;
-  }
-  // fill array with zeros
-  memset(new_positions, 0, terminal_height * terminal_width * sizeof(int));
+static bool handle_input(struct sandpile *sandpile);
 
-  printf("The terminal size is: %d rows, %d columns\n", terminal_height,
-         terminal_width);
+int main(void)
+{
+	struct sandpile sandpile;
 
-  printf("starting abellian sandpile simulation\n");
+	if (initscr() == NULL) {
+		fprintf(stderr, "Failed to init ncurses screen");
+	}
 
-  startup_status = init_grid(terminal_height, terminal_width, positions);
-  if (startup_status) {
-    fprintf(stderr, "Failed to initialize grid");
-  }
+	if (has_colors()) {
+		start_color();
+		use_default_colors();
 
-  uint32_t render_count = 100; //100 renders
-  uint32_t render_gap = 100000; //renders every 100k time steps
-  for (uint32_t i = 0; i < render_count; i++) {
-    // drop a 'grain' of sand of top of sandpile
-    for (uint32_t j = 0; j < render_gap; j++) {
-      positions[terminal_height / 2][terminal_width / 2] += 1;
-      get_new_positions(terminal_height, terminal_width, positions,
-                        new_positions);
-    }
-    uint64_t current_step = i * render_gap;
-    printf("time step: %u", (unsigned int)current_step);
+		// colors
+		init_pair(1, COLOR_GREEN, COLOR_BLACK);
+		init_pair(2, COLOR_YELLOW, COLOR_BLACK);
+		init_pair(3, COLOR_CYAN, COLOR_BLACK);
+		init_pair(4, COLOR_WHITE, COLOR_BLACK);
+	}
 
-    printf(CLEAR_GRID);
-    render(terminal_height, terminal_width, positions, new_positions);
-  }
+	cbreak();
+	noecho();
+	keypad(stdscr, true);
+	nodelay(stdscr, true);
+	curs_set(0);
 
-  free(positions);
-  free(new_positions);
-  return 0;
+	init_sandpile(&sandpile);
+
+	bool running = true;
+	while (running) {
+		if (!sandpile.paused) {
+			add_grain(&sandpile);
+			update_sandpile(&sandpile);
+			draw_sandpile(&sandpile);
+		}
+		running = handle_input(&sandpile);
+	}
+
+	destroy_sandpile(&sandpile);
+	endwin();
+
+	return 0;
 }
 
-int init_grid(int height, int width, int (*positions)[width]) {
-  printf("\033[H\033[J Starting abellian sandpile model.....\n");
-  for (int i = 0; i < height; i++) {
-    for (int j = 0; j < width; j++) {
-      printf(" ");
-    }
-    printf("\n");
-  }
-  return 0;
+static void init_sandpile(struct sandpile *sandpile)
+{
+	// gets screen dimensions
+	getmaxyx(stdscr, sandpile->rows, sandpile->columns);
+	sandpile->rows -= 1;
+	sandpile->columns /= 2;
+
+	sandpile->cells =
+	    calloc(sandpile->rows * sandpile->columns, sizeof(size_t));
+	sandpile->next =
+	    calloc(sandpile->rows * sandpile->columns, sizeof(size_t));
+
+	sandpile->paused = false;
+	sandpile->steps = 0;
+
+	erase();
 }
 
-int get_new_positions(int height, int width, int (*positions)[width],
-                      int (*new_positions)[width]) {
-  memset(new_positions, 0, width * height * sizeof(int));
-  // getting new positions
-  for (int i = 0; i < height; i++) {
-    for (int j = 0; j < width; j++) {
-      if (positions[i][j] >= 4) {
-        new_positions[i][j] = 0; // Current cell becomes stable
-
-        // Distribute sand to neighboring cells
-        if (i + 1 < height)
-          new_positions[i + 1][j] += 1; // Down
-        if (i - 1 >= 0)
-          new_positions[i - 1][j] += 1; // Up
-        if (j + 1 < width)
-          new_positions[i][j + 1] += 1; // Right
-        if (j - 1 >= 0)
-          new_positions[i][j - 1] += 1; // Left
-      } else {
-        new_positions[i][j] += positions[i][j]; // Stable cells remain the same
-      }
-    }
-  }
-  memcpy(positions, new_positions, height * width * sizeof(int));
-  return 0;
+static void destroy_sandpile(struct sandpile *sandpile)
+{
+	free(sandpile->cells);
+	free(sandpile->next);
 }
 
-int render(int height, int width, int (*positions)[width],
-           int (*new_positions)[width]) {
-  for (int i = 0; i < height; i++) {
-    for (int j = 0; j < width; j++) {
-      if (new_positions[i][j] == 0) {
-        printf(" "); // Empty cell
-      } else if (new_positions[i][j] == 1) {
-        printf(COLOR_ICE_BLUE "1"); // Cell with value 1
-      } else if (new_positions[i][j] == 2) {
-        printf(COLOR_LIGHT_BLUE "2"); // Cell with value 2
-      } else if (new_positions[i][j] == 3) {
-        printf(COLOR_MED_BLUE "3"); // Cell with value 3
-      } else if (new_positions[i][j] >= 4) {
-        printf(COLOR_DARK_BLUE "4"); // Cell with value 4 or more
-      }
-    }
-    printf("\n"); // Move to the next line after each row
-  }
-  return 0;
+static void add_grain(struct sandpile *sandpile)
+{
+	sandpile->cells[(sandpile->rows / 2) * sandpile->columns +
+			(sandpile->columns / 2)] += 1;
+}
+
+static void update_sandpile(struct sandpile *sandpile)
+{
+	// clear next to all 0s
+	memset(sandpile->next, 0,
+	       sandpile->rows * sandpile->columns * sizeof(size_t));
+
+	// calculating new positions
+	for (size_t row = 0; row < sandpile->rows; row++) {
+		for (size_t column = 0; column < sandpile->columns; column++) {
+			size_t value =
+			    sandpile->cells[row * sandpile->columns + column];
+			size_t topples = value / 4;
+
+			sandpile->next[row * sandpile->columns + column] +=
+			    value % 4;
+
+			if (column > 0) {
+				sandpile->next[row * sandpile->columns +
+					       column - 1] += topples;
+			}
+			if (column + 1 < sandpile->columns) {
+				sandpile->next[row * sandpile->columns +
+					       column + 1] += topples;
+			}
+			if (row > 0) {
+				sandpile->next[(row - 1) * sandpile->columns +
+					       column] += topples;
+			}
+			if (row + 1 < sandpile->rows) {
+				sandpile->next[(row + 1) * sandpile->columns +
+					       column] += topples;
+			}
+		}
+	}
+
+	size_t *tmp = sandpile->cells;
+	sandpile->cells = sandpile->next;
+	sandpile->next = tmp;
+
+	sandpile->steps++;
+}
+
+static void draw_status(struct sandpile *sandpile)
+{
+
+	char status[256];
+	snprintf(status, sizeof(status), "STEP: %zu %s", sandpile->steps,
+		 sandpile->paused ? "PAUSED" : "RUNNING");
+
+	attron(A_REVERSE);
+	move(0, 0);
+	mvaddnstr(0, 0, status, sandpile->columns);
+	for (int column = (int)strlen(status); column < sandpile->columns * 2;
+	     column++) {
+		mvaddch(0, column, ' ');
+	}
+	attroff(A_REVERSE);
+}
+
+static void draw_sandpile(struct sandpile *sandpile)
+{
+	char pixel;
+	size_t color_pair = 0;
+	bool is_bold = false;
+
+	for (size_t row = 0; row < sandpile->rows; row++) {
+		for (size_t column = 0; column < sandpile->columns; column++) {
+			// grab pixel value from array
+			size_t value =
+			    sandpile->cells[row * sandpile->columns + column];
+
+			// set color and ASCII character
+			if (value == 0) {
+				color_pair = 4;
+				pixel = ' ';
+			} else if (value == 1) {
+				color_pair = 4;
+				pixel = '.';
+				is_bold = false;
+			} else if (value == 2) {
+				color_pair = 3;
+				pixel = ':';
+				is_bold = false;
+			} else if (value == 3) {
+				color_pair = 2;
+				pixel = '#';
+				is_bold = true;
+			} else {
+				color_pair = 1;
+				pixel = '@';
+				is_bold = true;
+			}
+
+			if (color_pair > 0) {
+				attron(COLOR_PAIR(color_pair));
+				if (is_bold) {
+					attron(A_BOLD);
+				}
+			}
+
+			mvaddch(row + 1, column * 2, pixel);
+			mvaddch(row + 1, column * 2 + 1, pixel);
+
+			if (color_pair > 0) {
+				attroff(COLOR_PAIR(color_pair));
+				if (is_bold) {
+					attroff(A_BOLD);
+				}
+			}
+		}
+	}
+
+	draw_status(sandpile);
+	refresh();
+}
+
+static bool handle_input(struct sandpile *sandpile)
+{
+
+	int key = getch();
+
+	switch (key) {
+	case 'q':
+	case 'Q':
+		return false;
+
+	case ' ':
+	case 'p':
+	case 'P':
+		sandpile->paused = !sandpile->paused;
+		break;
+
+		// case 'r':
+		// case 'R':
+		// 	destroy_sandpile(sandpile);
+		// 	break;
+
+	default:
+		break;
+	}
+
+	return true;
 }
